@@ -11,7 +11,7 @@ Computer vision final project workspace.
 ├── README.md          # Project notes and setup instructions
 ├── requirements.txt   # Python dependencies
 ├── datasets/          # Local/remote datasets, not tracked by Git
-└── outputs/           # Generated outputs, logs, and checkpoints, not tracked by Git
+└── outputs/           # Milestone deliverables and generated outputs
 ```
 
 ## Project Scripts
@@ -70,7 +70,7 @@ datasets/curated_genimage/
 
 ## M1 Outputs
 
-Milestone 1 key output files are stored here:
+Milestone 1 key output files are stored here and tracked by Git:
 
 ```text
 outputs/M1/
@@ -85,6 +85,10 @@ name, real/fake label, binary fake label, and filename.
 `dataset_statistics.csv` records real/fake counts by generator and by split.
 
 `samples/` contains one real and one fake example image for each split.
+
+Other generated outputs, checkpoints, logs, and large experiment artifacts
+should remain untracked unless they are intentionally selected as milestone
+deliverables.
 
 ## Image Formats
 
@@ -105,21 +109,22 @@ Do not filter by extension unless the code includes both `.png`, `.jpg`,
 
 ## Daily Git Push
 
-Use this workflow to back up code changes to GitHub:
+Use this workflow to back up code changes and milestone deliverables to GitHub:
 
 ```bash
 cd /root/autodl-tmp/488FP
 
 git status
-git add projects configs README.md requirements.txt .gitignore
-git commit -m "Update project code"
+git add projects configs outputs/M1 README.md requirements.txt .gitignore
+git commit -m "Update project code and outputs"
 git push
 ```
 
-Before committing, check that `datasets/`, `outputs/`, checkpoints, archives,
-and logs are not included in `git status`.
+Before committing, check that `datasets/`, checkpoints, archives, logs, and
+large non-milestone outputs are not included in `git status`.
 
 ## Git Policy
 
-Track code, configs, documentation, and dependency files. Do not track datasets,
-checkpoints, archives, generated outputs, logs, or caches.
+Track code, configs, documentation, dependency files, and selected milestone
+outputs such as `outputs/M1`. Do not track datasets, checkpoints, archives,
+logs, caches, or large intermediate experiment outputs.

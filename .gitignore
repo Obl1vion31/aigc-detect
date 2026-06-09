@@ -1,6 +1,10 @@
 datasets/
-outputs/
 backups/
+
+# Track milestone deliverables under outputs/M1, but ignore other generated outputs.
+outputs/*
+!outputs/M1/
+!outputs/M1/**
 
 # Large archives and model artifacts
 *.zip
