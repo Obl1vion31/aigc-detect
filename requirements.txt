@@ -1,0 +1,7 @@
+# Add project dependencies here, for example:
+# torch
+# torchvision
+# numpy
+# opencv-python
+# scikit-learn
+# matplotlib

@@ -1,0 +1,24 @@
+datasets/
+outputs/
+backups/
+
+# Large archives and model artifacts
+*.zip
+*.z[0-9][0-9]
+*.pt
+*.pth
+*.ckpt
+*.onnx
+
+# Logs, caches, and notebooks
+*.log
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+
+# Environment and editor files
+.env
+.venv/
+venv/
+.idea/
+.vscode/
