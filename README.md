@@ -40,6 +40,21 @@ cd /root/autodl-tmp/488FP
 /root/miniconda3/bin/python projects/curate_genimage.py --export-m1-only
 ```
 
+```text
+projects/analyze_m1_resolutions.py
+```
+
+Reads `outputs/M1/metadata.csv`, opens each selected image without modifying it,
+records width, height, area, image format, invalid files, and exports resolution
+statistics plus visualization plots to `outputs/M1/resolution_analysis`.
+
+Run the analysis:
+
+```bash
+cd /root/autodl-tmp/488FP
+/root/miniconda3/bin/python projects/analyze_m1_resolutions.py
+```
+
 ## Dataset
 
 The original dataset is stored on the AutoDL server and should not be committed
@@ -76,7 +91,8 @@ Milestone 1 key output files are stored here and tracked by Git:
 outputs/M1/
 ├── metadata.csv
 ├── dataset_statistics.csv
-└── samples/
+├── samples/
+└── resolution_analysis/
 ```
 
 `metadata.csv` records each image path, source path, split, generator, class
@@ -85,6 +101,10 @@ name, real/fake label, binary fake label, and filename.
 `dataset_statistics.csv` records real/fake counts by generator and by split.
 
 `samples/` contains one real and one fake example image for each split.
+
+`resolution_analysis/` contains resolution summary CSVs, invalid image records,
+and visualization plots for image format counts, width/height scatter, and image
+area distribution.
 
 Other generated outputs, checkpoints, logs, and large experiment artifacts
 should remain untracked unless they are intentionally selected as milestone
