@@ -1,23 +1,22 @@
-# Project Scripts
+# 项目脚本说明
 
-This folder contains the data-curation, analysis, and model-training scripts for
-the GenImage AIGC detection project.
+这个文件夹包含 GenImage AIGC 检测项目的数据整理、数据分析和模型训练脚本。
 
-## Split-Curation Scripts
+## 数据划分脚本
 
 ### `curate_biggan_to_sd15_split.py`
 
-Purpose: create the original split used in Milestone 1 and the first Milestone 2
-baseline.
+用途：创建 Milestone 1 使用的原始数据划分，也是第一个 Milestone 2 baseline 使用的
+划分。
 
-Protocol:
+实验协议：
 
-- Training generator: BigGAN.
-- Validation generator: BigGAN.
-- Seen test generator: BigGAN.
-- Unseen test generator: Stable Diffusion v1.5.
+- 训练生成器：BigGAN。
+- 验证生成器：BigGAN。
+- seen 测试生成器：BigGAN。
+- unseen 测试生成器：Stable Diffusion v1.5。
 
-Main output:
+主要输出：
 
 ```text
 datasets/curated_genimage/
@@ -25,22 +24,21 @@ datasets/curated_genimage/
 `-- dataset_statistics.csv
 ```
 
-This split is useful because it directly tests whether a detector trained on
-BigGAN can transfer to a more realistic diffusion generator. The result shows
-that this transfer is very weak.
+这个划分用于测试：一个只在 BigGAN fake 图像上训练的检测器，能否迁移到更真实的
+diffusion 生成图上。实验结果显示，这种迁移非常弱。
 
 ### `curate_sd15_to_biggan_split.py`
 
-Purpose: create the reverse split used in Milestone 2.
+用途：创建 Milestone 2 的反向数据划分。
 
-Protocol:
+实验协议：
 
-- Training generator: Stable Diffusion v1.5.
-- Validation generator: Stable Diffusion v1.5.
-- Seen test generator: Stable Diffusion v1.5.
-- Unseen test generator: BigGAN.
+- 训练生成器：Stable Diffusion v1.5。
+- 验证生成器：Stable Diffusion v1.5。
+- seen 测试生成器：Stable Diffusion v1.5。
+- unseen 测试生成器：BigGAN。
 
-Main output:
+主要输出：
 
 ```text
 datasets/curated_genimage_sd15_train/
@@ -48,132 +46,130 @@ datasets/curated_genimage_sd15_train/
 `-- dataset_statistics.csv
 ```
 
-This split tests the intuition that training on more realistic SD1.5 fake images
-might learn more general fake-image evidence. The result is still weak on unseen
-BigGAN, so single-generator training remains the main limitation.
+这个划分用于验证一个直觉：如果用更真实的 SD1.5 fake 图像训练，模型是否会学到更
+通用的 fake 图像证据。实验结果显示，unseen BigGAN 上仍然很弱，所以单一生成器训练
+仍然是主要限制。
 
-## Analysis Script
+## 数据分析脚本
 
 ### `analyze_m1_resolutions.py`
 
-Purpose: inspect image validity, native image resolution, image format, and area
-distribution for the Milestone 1 curated subset.
+用途：检查 Milestone 1 curated subset 中的图像有效性、原始分辨率、图像格式和图像
+面积分布。
 
-Main output:
+主要输出：
 
 ```text
 outputs/M1/resolution_analysis/
 ```
 
-This script does not train a model. It only validates and describes the dataset.
+这个脚本不训练模型，只用于验证和描述数据集。
 
-## Training Script
+## 训练脚本
 
 ### `train_resnet18_baseline.py`
 
-Purpose: train and evaluate a ResNet-18 real/fake baseline.
+用途：训练和评估 ResNet-18 real/fake 二分类 baseline。
 
-The script performs the full Milestone 2 pipeline:
+该脚本完成完整的 Milestone 2 训练流程：
 
-1. Read metadata CSV rows.
-2. Filter rows by split and generator.
-3. Load images with PIL and convert them to RGB.
-4. Apply training or evaluation transforms.
-5. Train a ResNet-18 binary classifier using cross-entropy loss.
-6. Validate after each epoch.
-7. Save the best checkpoint according to validation loss by default.
-8. Apply early stopping when validation loss stops improving.
-9. Evaluate the selected checkpoint on validation, seen test, and unseen test.
-10. Export metrics, training curves, confusion matrices, and seen/unseen plots.
+1. 读取 metadata CSV。
+2. 按 split 和 generator 筛选样本。
+3. 使用 PIL 读取图像并转换为 RGB。
+4. 对训练集或评估集应用对应 transform。
+5. 使用 cross-entropy loss 训练 ResNet-18 二分类器。
+6. 每个 epoch 结束后在 validation split 上评估。
+7. 默认根据 validation loss 保存最佳 checkpoint。
+8. 如果 validation loss 不再改善，则触发 early stopping。
+9. 使用最佳 checkpoint 评估 validation、seen test 和 unseen test。
+10. 导出 metrics、training curves、confusion matrices 和 seen/unseen 对比图。
 
-### Dataset Flow
+### 数据流
 
-The script uses `GenImageMetadataDataset`.
+脚本使用 `GenImageMetadataDataset` 读取数据。
 
-Each metadata row contains:
+每一行 metadata 包含：
 
-- relative image path,
-- split,
-- generator,
-- label (`real` or `fake`),
-- filename and related metadata.
+- 图像相对路径；
+- 实验 split；
+- generator 名称；
+- 标签，`real` 或 `fake`；
+- 文件名和其他 metadata。
 
-The dataset class filters rows such as:
+Dataset 会根据命令行参数筛选样本，例如：
 
 ```text
 split == "train" and generator == "BigGAN"
 ```
 
-or:
+或者：
 
 ```text
 split == "test_unseen" and generator == "stable_diffusion_v_1_5"
 ```
 
-This design lets the same training script run both generator directions simply
-by changing command-line arguments.
+因此，同一个训练脚本可以通过不同命令行参数运行两个方向的实验。
 
-### Model
+### 模型
 
-The model is ResNet-18 with the final classification head replaced by a
-two-class output layer:
+模型是 ResNet-18。原始最后一层分类头被替换为二分类输出层：
 
 ```text
 real -> class 0
 fake -> class 1
 ```
 
-The output before softmax is two logits:
+模型在 softmax 之前输出两个 logits：
 
 ```text
 logit_real, logit_fake
 ```
 
-During training, `nn.CrossEntropyLoss` consumes the raw logits directly. During
-evaluation, the script applies softmax and uses `P(fake)` as the continuous fake
-score for AUC.
+训练时，`nn.CrossEntropyLoss` 直接接收 raw logits，不需要提前手动 softmax。
 
-### One Epoch
+评估时，脚本会对 logits 做 softmax，并使用 `P(fake)` 作为 fake 类的连续置信分数，
+用于计算 AUC。
 
-One epoch means the model sees every image in the training split once.
+### 一个 epoch 中发生什么
 
-Inside one epoch:
+一个 epoch 表示模型完整看过一次训练 split 中的所有图像。
 
-1. A mini-batch of images and labels is loaded.
-2. Images are passed through ResNet-18.
-3. The model outputs two logits per image.
-4. Cross-entropy loss compares logits with the true labels.
-5. Backpropagation computes gradients.
-6. AdamW updates the model weights.
-7. The script accumulates average training loss.
+在一个 epoch 内部：
 
-After the epoch finishes, the model is evaluated on the validation split. The
-validation step does not update model weights.
+1. DataLoader 取出一个 mini-batch 的图像和标签。
+2. 图像输入 ResNet-18。
+3. 模型为每张图输出两个 logits。
+4. Cross-entropy loss 比较 logits 和真实标签。
+5. Backpropagation 计算梯度。
+6. AdamW 根据梯度更新模型参数。
+7. 脚本累计平均 training loss。
 
-### Overfitting Control
+一个 epoch 结束后，模型会在 validation split 上评估。Validation 过程只计算指标，
+不更新模型参数。
 
-The first BigGAN baseline overfit quickly: training loss decreased while
-validation loss increased after the first epoch.
+### 过拟合控制
 
-The current script includes several controls:
+最初的 BigGAN baseline 很快出现过拟合：training loss 持续下降，但 validation loss
+在第 1 个 epoch 后开始上升，validation accuracy 和 F1 也下降。
 
-- lower default learning rate,
-- larger weight decay,
-- dropout before the final classifier,
-- label smoothing,
-- stronger training augmentation,
-- cosine learning-rate schedule,
-- checkpoint selection by validation loss,
-- early stopping.
+当前脚本加入了以下控制：
 
-These controls prevent blindly training more epochs. However, the regularized
-BigGAN run still selected epoch 1 as the best checkpoint and still failed on
-unseen SD1.5. This indicates that the main limitation is not only ordinary
-overfitting, but generator-specific learning from a single training generator.
+- 更低的默认 learning rate；
+- 更大的 weight decay；
+- 分类头前的 dropout；
+- label smoothing；
+- 更强的数据增强；
+- cosine learning-rate schedule；
+- 根据 validation loss 保存 checkpoint；
+- early stopping。
 
-### Outputs
+这些机制可以避免盲目训练更多 epoch。实际 regularized BigGAN 实验仍然选择 epoch 1
+作为最佳 checkpoint，并且仍然不能泛化到 unseen SD1.5。这说明主要限制不只是普通
+overfitting，而是单一训练生成器导致的 generator-specific learning。
 
-For each run, the script writes:
+### 输出文件
+
+每次训练会输出：
 
 ```text
 metrics.csv
@@ -186,5 +182,4 @@ run_config.json
 checkpoints/best_resnet18.pt
 ```
 
-The checkpoint file is useful on the server, but it is ignored by Git because it
-is a large model artifact.
+checkpoint 文件在服务器上有用，但因为属于较大的模型 artifact，所以被 Git 忽略。

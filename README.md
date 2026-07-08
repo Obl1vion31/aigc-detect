@@ -1,54 +1,58 @@
-# 488FP
+# 488FP 项目仓库
 
-Computer vision final project workspace for AIGC image detection on GenImage.
+这是 ECE4880J 计算机视觉课程项目的代码与实验输出仓库。项目主题是
+GenImage 数据集上的 AIGC 图像检测，也就是判断输入图像是 `real` 还是 `fake`。
 
-## Repository Layout
+项目重点不是只追求 seen generator 上的高准确率，而是研究模型在
+cross-generator distribution shift 下是否仍然可靠。
+
+## 仓库结构
 
 ```text
 488FP/
-|-- projects/          # Project source code and experiment scripts
-|-- configs/           # Training/evaluation configuration files
-|-- outputs/           # Selected milestone deliverables
-|-- README.md          # Project notes and setup instructions
-|-- requirements.txt   # Python dependencies
-`-- datasets/          # Local/remote datasets, not tracked by Git
+|-- projects/          # 数据整理、分析、训练脚本
+|-- configs/           # 配置文件
+|-- outputs/           # 课程 milestone 需要提交/保留的结果
+|-- README.md          # 项目总说明
+|-- requirements.txt   # Python 依赖
+`-- datasets/          # 本地/服务器数据集目录，不提交到 Git
 ```
 
-## Project Scripts
+## 主要脚本
 
-See `projects/README.md` for detailed script-level explanations.
+更详细的脚本说明见 `projects/README.md`。
 
-`projects/curate_biggan_to_sd15_split.py` creates the original Milestone 1 split:
-BigGAN is used for training/validation/seen testing, and Stable Diffusion v1.5
-is held out as the unseen generator.
+`projects/curate_biggan_to_sd15_split.py` 用于创建最初的 Milestone 1 数据划分：
+BigGAN 用作训练、验证和 seen 测试生成器，Stable Diffusion v1.5 作为 unseen 测试
+生成器。
 
 ```bash
 cd /root/autodl-tmp/488FP
 /root/miniconda3/bin/python projects/curate_biggan_to_sd15_split.py
 ```
 
-`projects/curate_sd15_to_biggan_split.py` creates the reverse Milestone 2 split:
-Stable Diffusion v1.5 is used for training/validation/seen testing, while BigGAN
-is held out as the unseen generator.
+`projects/curate_sd15_to_biggan_split.py` 用于创建反向 Milestone 2 数据划分：
+Stable Diffusion v1.5 用作训练、验证和 seen 测试生成器，BigGAN 作为 unseen 测试
+生成器。
 
 ```bash
 cd /root/autodl-tmp/488FP
 /root/miniconda3/bin/python projects/curate_sd15_to_biggan_split.py
 ```
 
-`projects/analyze_m1_resolutions.py` reads `outputs/M1/metadata.csv`, records
-image sizes and formats, and exports Milestone 1 resolution plots.
+`projects/analyze_m1_resolutions.py` 读取 `outputs/M1/metadata.csv`，统计图像尺寸、格式
+和无效图像，并导出 Milestone 1 的分辨率分析图表。
 
 ```bash
 cd /root/autodl-tmp/488FP
 /root/miniconda3/bin/python projects/analyze_m1_resolutions.py
 ```
 
-`projects/train_resnet18_baseline.py` trains and evaluates a ResNet-18 binary
-real/fake classifier with cross-entropy loss. It includes early stopping,
-regularization, augmentation options, and writes metrics plus plots.
+`projects/train_resnet18_baseline.py` 用于训练和评估 ResNet-18 real/fake 二分类基线。
+脚本包含 early stopping、regularization、data augmentation、checkpoint 保存、
+指标计算和绘图。
 
-Example BigGAN-to-SD1.5 regularized run:
+BigGAN 到 SD1.5 的 regularized 训练示例：
 
 ```bash
 cd /root/autodl-tmp/488FP
@@ -61,7 +65,7 @@ cd /root/autodl-tmp/488FP
   --weights none
 ```
 
-Example SD1.5-to-BigGAN run:
+SD1.5 到 BigGAN 的训练示例：
 
 ```bash
 cd /root/autodl-tmp/488FP
@@ -76,28 +80,31 @@ cd /root/autodl-tmp/488FP
   --weights none
 ```
 
-## Dataset
+## 数据集位置
 
-The original dataset is stored on the AutoDL/server instance and should not be
-committed to Git.
+原始数据集存放在 AutoDL/服务器实例上，不提交到 Git。
 
 ```text
 /root/autodl-tmp/488FP/datasets/GenImage
 ```
 
-Current source dataset subsets:
+当前使用的 GenImage 子集：
 
 ```text
 datasets/GenImage/BigGAN/imagenet_ai_0419_biggan/{train,val}/{ai,nature}
 datasets/GenImage/stable_diffusion_v_1_5/imagenet_ai_0424_sdv5/{train,val}/{ai,nature}
 ```
 
-## Outputs
+其中：
 
-Milestone 1 deliverables are under `outputs/M1/`, including dataset metadata,
-statistics, sample images, and resolution-analysis plots.
+- `ai` 表示 AI 生成图，训练标签为 `fake`。
+- `nature` 表示真实自然图，训练标签为 `real`。
 
-Milestone 2 deliverables are under `outputs/M2/`:
+## 输出结果
+
+Milestone 1 结果位于 `outputs/M1/`，包括数据 metadata、统计表、样例图和分辨率分析。
+
+Milestone 2 结果位于 `outputs/M2/`：
 
 ```text
 outputs/M2/
@@ -107,11 +114,38 @@ outputs/M2/
 `-- sd15_to_biggan/
 ```
 
-Each M2 experiment folder contains metrics CSVs and visualization PNGs. See
-`outputs/M2/README.md` for interpretation of the training curves, confusion
-matrices, seen/unseen gap, and regularization results.
+每个 M2 实验文件夹包含：
 
-## Git Policy
+- `metrics.csv`：validation、seen test、unseen test 的 loss、accuracy、F1、AUC 和混淆矩阵计数。
+- `training_log.csv`：每个 epoch 的训练和验证指标。
+- `training_curves.png`：训练曲线。
+- `confusion_matrix_seen.png`：seen generator 上的混淆矩阵。
+- `confusion_matrix_unseen.png`：unseen generator 上的混淆矩阵。
+- `seen_unseen_comparison.png`：seen/unseen 指标对比图。
 
-Track code, configs, documentation, and selected milestone outputs. Do not track
-datasets, checkpoints, archives, logs, caches, or temporary experiment folders.
+更详细的结果解释见 `outputs/M2/README.md`。
+
+## 当前主要结论
+
+ResNet-18 可以很好地学习单一 seen generator 上的 real/fake 分类，但不能自然泛化到
+unseen generator。
+
+BigGAN 到 SD1.5 的实验显示，模型在 BigGAN seen test 上几乎完美，但在 SD1.5 fake
+图像上几乎全部漏检。加入更强 regularization 和 early stopping 后，过拟合过程得到
+控制，但 unseen SD1.5 仍然接近随机。
+
+这说明当前问题不只是普通 overfitting，而是 single-generator training 导致的
+generator-specific learning。
+
+## Git 管理原则
+
+提交到 Git 的内容包括代码、配置、文档和选定的 milestone 输出。
+
+以下内容不提交：
+
+- 原始数据集；
+- checkpoint 权重文件；
+- 压缩包和下载中间产物；
+- 训练日志；
+- 临时实验目录；
+- cache 文件。
