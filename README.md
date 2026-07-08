@@ -52,7 +52,7 @@ cd /root/autodl-tmp/488FP
 脚本包含 early stopping、regularization、data augmentation、checkpoint 保存、
 指标计算和绘图。
 
-BigGAN 到 SD1.5 的 regularized 训练示例：
+BigGAN 到 SD1.5 的训练示例：
 
 ```bash
 cd /root/autodl-tmp/488FP
@@ -61,7 +61,7 @@ cd /root/autodl-tmp/488FP
   --train-generator BigGAN \
   --seen-generator BigGAN \
   --unseen-generator stable_diffusion_v_1_5 \
-  --output-dir outputs/M2/biggan_to_sd15_regularized \
+  --output-dir outputs/M2/biggan_to_sd15 \
   --weights none
 ```
 
@@ -110,7 +110,6 @@ Milestone 2 结果位于 `outputs/M2/`：
 outputs/M2/
 |-- README.md
 |-- biggan_to_sd15/
-|-- biggan_to_sd15_regularized/
 `-- sd15_to_biggan/
 ```
 
@@ -128,7 +127,8 @@ outputs/M2/
 ## 当前主要结论
 
 ResNet-18 可以很好地学习单一 seen generator 上的 real/fake 分类，但不能自然泛化到
-unseen generator。
+unseen generator。当前两个 M2 方向都使用同一套 regularized/early-stopping 训练设置，
+因此结果可比。
 
 BigGAN 到 SD1.5 的实验显示，模型在 BigGAN seen test 上几乎完美，但在 SD1.5 fake
 图像上几乎全部漏检。加入更强 regularization 和 early stopping 后，过拟合过程得到

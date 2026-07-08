@@ -1,163 +1,103 @@
 # Milestone 2 输出说明
 
-这个文件夹保存 Milestone 2 的基线实验结果。当前模型是一个
-ResNet-18 二分类器，用来判断图像是 `real` 还是 `fake`，训练损失是
-cross-entropy loss。
+本文件夹保存 Milestone 2 的正式实验结果。当前两个方向都使用同一套模型和训练策略：
+ResNet-18、cross-entropy loss、strong augmentation、dropout、label smoothing、weight
+decay、cosine learning-rate schedule、validation-loss checkpoint 和 early stopping。
 
-## 文件夹命名
+也就是说，`biggan_to_sd15/` 和 `sd15_to_biggan/` 不是两套不同模型；它们只是训练源
+生成器和 unseen 测试生成器不同。
+
+## 文件夹结构
 
 ```text
 outputs/M2/
-|-- biggan_to_sd15/      # 用 BigGAN 训练/验证，用 SD1.5 做 unseen 测试
-`-- sd15_to_biggan/      # 用 SD1.5 训练/验证，用 BigGAN 做 unseen 测试
+|-- README.md
+|-- biggan_to_sd15/      # BigGAN 训练，SD1.5 unseen 测试
+`-- sd15_to_biggan/      # SD1.5 训练，BigGAN unseen 测试
 ```
 
-命名方式是 `训练生成器_to_unseen生成器`。前半部分表示模型主要从哪个生成器
-学习 real/fake 区分方式，后半部分表示哪个生成器没有参与训练，用来测试跨生成
-器泛化能力。
-
-## 这个实验到底在看什么
-
-这个实验不是只看模型能不能在训练过的生成器上分类正确。更重要的问题是：
-
-模型学到的是通用的 AI 图像检测特征，还是只记住了某一个生成器自己的 artifact？
-
-所以我们同时看两类结果：
-
-- `seen test`：测试生成器和训练生成器一致，用来判断模型是否学会了当前训练域。
-- `unseen test`：测试生成器没有出现在训练中，用来判断模型能不能跨生成器泛化。
-
-如果 `seen test` 很高，但 `unseen test` 接近随机，说明模型不是完全没学会，而是
-学到的东西太依赖训练生成器。
-
-## 混淆矩阵怎么看
-
-混淆矩阵的纵轴是 `True`，也就是真实标签；横轴是 `Predicted`，也就是模型预测。
+每个实验目录包含：
 
 ```text
-                 Predicted real    Predicted fake
-True real        TN                FP
-True fake        FN                TP
+metrics.csv
+training_log.csv
+training_curves.png
+confusion_matrix_seen.png
+confusion_matrix_unseen.png
+seen_unseen_comparison.png
+run_config.json
+checkpoints/best_resnet18.pt
 ```
 
-在本项目里：
+其中 checkpoint 文件在服务器上保留，但被 Git 忽略，不作为代码仓库内容提交。
 
-- 左上角：真实 real，被预测成 real，正确。
-- 右上角：真实 real，被预测成 fake，误报。
-- 左下角：真实 fake，被预测成 real，漏检 AI 图。
-- 右下角：真实 fake，被预测成 fake，正确检测 AI 图。
+## 为什么不是固定训练 10 个 epoch
 
-因为我们的目标是检测 AI 生成图，所以左下角特别关键。左下角越大，说明越多 AI
-图被模型当成自然图，这是最严重的问题之一。
+课程示例里常见 `10 epochs`，但 epoch 数不是一个必须固定的值。一个 epoch 表示模型
+完整看过一次训练集。本项目每个 epoch 大约包含 28-29 万张训练图像，因此一个 epoch
+本身已经是很大的训练量。
 
-## 例子：`biggan_to_sd15` 的两张混淆矩阵
+更重要的是，是否继续训练应该由 validation set 决定。如果 training loss 继续下降，
+但 validation loss 上升，说明模型正在更好地拟合训练集，却更差地泛化到验证集，这
+就是过拟合。
 
-你截图里右边是 `confusion_matrix_seen.png`，也就是 seen BigGAN 测试结果：
+所以当前脚本采用：
+
+- 最多训练 `10` 个 epoch；
+- 每个 epoch 后验证一次；
+- 默认按 `val_loss` 保存最佳 checkpoint；
+- 如果 `val_loss` 连续 2 个 epoch 不改善，就 early stop；
+- 最终测试使用最佳 checkpoint，而不是最后一个 epoch 的模型。
+
+因此，BigGAN 方向最终选择 epoch 1，而 SD1.5 方向最终选择 epoch 3。这不是实验不
+完整，而是两个数据源的过拟合速度不同。
+
+## 过拟合为什么容易发生
+
+本项目容易过拟合主要有几个原因。
+
+第一，训练源是单一生成器。BigGAN fake 图像有明显的 generator-specific artifact，
+模型很容易学到这些低层痕迹，而不是通用的 AI 图像特征。
+
+第二，数据量虽然大，但分布并不丰富。训练 split 里 fake 图像来自同一个 generator，
+所以增加样本数量并不等于增加 generator diversity。
+
+第三，real/fake 的差异可能混入了分辨率、压缩、纹理、颜色统计等 shortcut。CNN 很
+擅长利用这些 shortcut，因此 seen generator 上表现很好，但 unseen generator 上失效。
+
+第四，ResNet-18 是从随机初始化训练的，没有 ImageNet 预训练特征作为先验，因此更
+容易从当前训练数据中学习局部 artifact。
+
+Regularization 可以减缓过拟合，但不能从根本上提供 unseen generator 的多样性。因此
+单靠 dropout、weight decay、augmentation 不能完全解决 cross-generator generalization。
+
+## 统一训练设置
+
+两个方向都使用以下核心设置：
 
 ```text
-真实 real -> 预测 real: 5899
-真实 real -> 预测 fake: 101
-真实 fake -> 预测 real: 2
-真实 fake -> 预测 fake: 5998
+model: ResNet-18
+weights: none
+max epochs: 10
+learning rate: 1e-4
+weight decay: 1e-3
+dropout: 0.2
+label smoothing: 0.05
+augmentation: strong
+random erasing probability: 0.15
+checkpoint metric: val_loss
+early stopping patience: 2
 ```
 
-这说明模型在 BigGAN 测试集上几乎完全学会了分类：
-
-- 6000 张真实图里，5899 张被正确识别为 real。
-- 6000 张 BigGAN fake 图里，5998 张被正确识别为 fake。
-- fake 漏检只有 2 张，说明在 seen domain 里模型非常会抓 BigGAN 的生成痕迹。
-
-所以右图反映的是：模型在训练过的生成器分布上表现很好，训练本身是成功的。
-
-你截图里左边是 `confusion_matrix_unseen.png`，也就是 unseen SD1.5 测试结果：
-
-```text
-真实 real -> 预测 real: 7876
-真实 real -> 预测 fake: 124
-真实 fake -> 预测 real: 7977
-真实 fake -> 预测 fake: 23
-```
-
-这说明模型遇到 Stable Diffusion 1.5 后基本失效：
-
-- 8000 张真实图里，7876 张仍然被预测成 real，这部分看起来还可以。
-- 但 8000 张 SD1.5 fake 图里，只有 23 张被预测成 fake。
-- 7977 张 SD1.5 fake 图被预测成 real，也就是几乎所有 AI 图都被漏检。
-
-所以左图反映的是：模型没有学到能够迁移到 SD1.5 的通用 AI 检测特征。它更像是
-学会了 BigGAN 的特定痕迹，而不是学会了“AI 图像”这个更一般的概念。
-
-这就是为什么 `biggan_to_sd15` 的 seen 指标很高，但 unseen F1 极低。
-
-## 指标怎么看
-
-`accuracy` 表示整体预测正确率。因为测试集 real/fake 基本平衡，所以 accuracy
-接近 `0.5` 时，通常意味着接近随机猜。
-
-`F1` 是 fake 类 precision 和 recall 的综合指标。它回答的是：模型检测 AI 图
-是否既准又全。对于本项目，F1 很重要，因为我们特别关心 fake 图有没有被抓出来。
-
-`AUC` 看的是模型给 fake 图的分数排序能力。AUC 接近 `1.0` 表示模型通常会给
-fake 图更高的 fake 概率；AUC 接近 `0.5` 表示模型基本没有区分 real/fake 的
-有效排序能力。
-
-简单说：
-
-- F1 更接近“当前阈值下，模型真的检测得怎么样”。
-- AUC 更接近“模型输出的 fake 分数本身有没有区分能力”。
+训练时使用 cross-entropy loss。模型输出两个 logits：`logit_real` 和 `logit_fake`。
+训练阶段不需要手动 softmax，因为 `nn.CrossEntropyLoss` 内部会处理 logits。评估
+阶段会显式 softmax，并使用 `P(fake)` 计算 AUC。
 
 ## 实验一：BigGAN 训练，SD1.5 unseen
 
 文件夹：`biggan_to_sd15`
 
-```text
-Seen BigGAN test:
-accuracy = 0.9914
-F1       = 0.9915
-AUC      = 0.9977
-
-Unseen SD1.5 test:
-accuracy = 0.4937
-F1       = 0.0056
-AUC      = 0.5230
-```
-
-这个结果说明模型在 BigGAN 上训练得很好。Seen accuracy、F1、AUC 都接近 1，
-说明模型可以非常稳定地区分 BigGAN fake 和 ImageNet real。
-
-但是 unseen SD1.5 上几乎崩掉。F1 只有 `0.0056`，结合混淆矩阵可以看出，主要
-原因不是模型把 real 误报成 fake，而是模型几乎把所有 SD1.5 fake 都预测成 real。
-
-因此，这个实验的核心结论是：BigGAN 训练出来的模型学到的是 BigGAN-specific
-artifact，不是足够通用的 AIGC 检测特征。
-
-## BigGAN 方向的过拟合检查和调参结果
-
-原始 BigGAN baseline 的训练日志显示出明显过拟合：
-
-```text
-epoch  train_loss  val_loss  val_accuracy  val_f1
-1      0.0826      0.0767    0.9769        0.9775
-2      0.0558      0.0936    0.9720        0.9720
-3      0.0482      0.1181    0.9551        0.9543
-```
-
-也就是说，训练集 loss 持续下降，但验证集 loss 持续上升，验证 accuracy 和 F1
-也下降。这不是只看 loss 的 calibration 问题，而是真正的验证集性能变差。
-
-因此训练代码已经加入以下防过拟合机制：
-
-- 使用更低学习率：`3e-4 -> 1e-4`。
-- 使用更高 weight decay：`1e-4 -> 1e-3`。
-- 在分类头前加入 dropout：`p = 0.2`。
-- 使用 label smoothing：`0.05`。
-- 加强训练增强：更大范围 random resized crop、color jitter、Gaussian blur、
-  random grayscale、random erasing。
-- 使用 cosine learning-rate schedule。
-- 使用 `val_loss` 选择 best checkpoint。
-- 加入 early stopping：如果 `val_loss` 连续 2 个 epoch 不改善，则停止训练。
-
-重新训练后的 regularized 结果保存在 `biggan_to_sd15_regularized/`。训练日志为：
+训练过程：
 
 ```text
 epoch  train_loss  val_loss  val_accuracy  val_f1   val_auc
@@ -166,8 +106,11 @@ epoch  train_loss  val_loss  val_accuracy  val_f1   val_auc
 3      0.1628      0.5420    0.7715        0.7081   0.9858
 ```
 
-该版本在 epoch 3 自动 early stop，并回滚使用 epoch 1 的最佳 checkpoint。最终测试
-结果为：
+BigGAN 方向在 epoch 1 后已经开始过拟合。虽然 training loss 持续下降，但 validation
+loss 上升，validation accuracy/F1 下降。脚本在 epoch 3 触发 early stopping，并回滚
+使用 epoch 1 的最佳 checkpoint。
+
+最终测试结果：
 
 ```text
 Seen BigGAN test:
@@ -181,76 +124,103 @@ F1       = 0.0095
 AUC      = 0.4938
 ```
 
-这个调参结果说明两件事：
-
-第一，过拟合确实存在，所以训练流程必须使用 early stopping，而不能无条件训练
-更多 epoch。
-
-第二，即使用更强正则化和增强，unseen SD1.5 仍然接近随机。这说明问题不只是
-普通意义上的 overfitting，而是单一 BigGAN 训练源导致的 generator-specific
-learning。模型可以在 BigGAN 上学得很好，但这些特征仍然不能迁移到 SD1.5。
+结论：模型在 BigGAN seen domain 上几乎完美，但遇到 SD1.5 fake 图像时几乎全部漏检。
+这说明模型主要学到了 BigGAN-specific artifact，而不是通用 AI 图像检测特征。
 
 ## 实验二：SD1.5 训练，BigGAN unseen
 
 文件夹：`sd15_to_biggan`
 
-```text
-Seen SD1.5 test:
-accuracy = 0.8310
-F1       = 0.8537
-AUC      = 0.9681
+训练过程：
 
-Unseen BigGAN test:
-accuracy = 0.5109
-F1       = 0.4058
-AUC      = 0.4977
+```text
+epoch  train_loss  val_loss  val_accuracy  val_f1   val_auc
+1      0.3961      0.3094    0.9003        0.9064   0.9643
+2      0.3213      0.2816    0.9153        0.9165   0.9744
+3      0.2869      0.2611    0.9271        0.9279   0.9820
+4      0.2625      0.2611    0.9250        0.9314   0.9851
+5      0.2447      0.4034    0.8579        0.8787   0.9765
 ```
 
-这个实验说明 SD1.5 训练任务本身更难。Seen accuracy 没有 BigGAN 那么高，但
-AUC 仍然很高，说明模型其实学到了一定的 real/fake 排序信号，只是默认阈值下
-仍然会犯一些分类错误。
+SD1.5 方向可以稳定训练更多 epoch。它在 epoch 1 到 epoch 3 持续改善，epoch 4 的
+F1/AUC 仍然较高，但 `val_loss` 没有继续改善；epoch 5 明显过拟合。脚本最终选择
+epoch 3 的最佳 checkpoint。
 
-但是 unseen BigGAN 的 AUC 接近 `0.5`，说明模型对 BigGAN real/fake 几乎没有
-可靠排序能力。虽然 F1 比上一个 unseen 结果高一些，但这并不代表真的泛化好了；
-更可能只是默认阈值让模型多预测了一些 fake，碰巧提高了 F1。
+最终测试结果：
 
-因此，这个实验同样说明：只用单一生成器训练，还不足以得到稳定的跨生成器检测器。
+```text
+Seen SD1.5 test:
+accuracy = 0.9244
+F1       = 0.9217
+AUC      = 0.9821
 
-## 每张图反映什么训练情况
+Unseen BigGAN test:
+accuracy = 0.5113
+F1       = 0.1131
+AUC      = 0.5545
+```
 
-`training_curves.png` 显示训练过程中 loss 和验证指标的变化。它主要用来判断模型
-有没有学起来、是否过拟合、以及验证集性能是否稳定。
+结论：SD1.5 训练方向经过 regularization 后，seen domain 表现比之前更稳定，但 unseen
+BigGAN 仍然接近随机。AUC 只有 0.5545，说明有一点点排序信号，但远远不够成为可靠的
+跨生成器检测器。
 
-`confusion_matrix_seen.png` 显示 seen 测试集的错误类型。如果对角线很深，说明模型
-在训练过的生成器分布上分类效果好。
+## 混淆矩阵怎么看
 
-`confusion_matrix_unseen.png` 显示 unseen 测试集的错误类型。这张图最关键，因为它
-直接反映模型遇到新生成器时会不会失效。
+混淆矩阵的纵轴是真实标签，横轴是模型预测标签：
 
-`seen_unseen_comparison.png` 把 seen 和 unseen 的 accuracy、F1、AUC 放在一起比较。
-如果 seen 高、unseen 低，说明模型存在明显 domain shift 问题。
+```text
+                 Predicted real    Predicted fake
+True real        TN                FP
+True fake        FN                TP
+```
 
-## 表格文件说明
+在本项目中，左下角 `FN` 尤其重要，因为它表示 AI 图像被漏检为真实图像。
 
-`metrics.csv` 保存 validation、seen test、unseen test 的 loss、accuracy、F1、
-AUC 和混淆矩阵计数。
+BigGAN 到 SD1.5 的 unseen 混淆矩阵中，大多数 SD1.5 fake 图像都落在左下角，因此
+F1 极低。
 
-`training_log.csv` 保存每个 epoch 的训练和验证指标。
+SD1.5 到 BigGAN 的 unseen 混淆矩阵中，也有大量 BigGAN fake 图像被预测为 real，
+说明跨生成器泛化仍然不足。
 
-`run_config.json` 保存这次训练运行时使用的参数。
+## 同一个脚本如何跑出不同 output
 
-`curation/dataset_statistics.csv` 出现在 `sd15_to_biggan/` 里，因为这个实验需要重新
-划分数据，让 SD1.5 作为训练生成器，BigGAN 作为 unseen 生成器。
+`train_resnet18_baseline.py` 是参数化脚本。它不会把 BigGAN 或 SD1.5 写死，而是根据
+命令行参数决定：
+
+- 从哪个 metadata CSV 读取数据；
+- 哪个 generator 用作训练；
+- 哪个 generator 用作 seen test；
+- 哪个 generator 用作 unseen test；
+- 输出结果写到哪个 output directory。
+
+例如 BigGAN 到 SD1.5：
+
+```bash
+--metadata-path datasets/curated_genimage/metadata.csv
+--train-generator BigGAN
+--seen-generator BigGAN
+--unseen-generator stable_diffusion_v_1_5
+--output-dir outputs/M2/biggan_to_sd15
+```
+
+SD1.5 到 BigGAN：
+
+```bash
+--metadata-path datasets/curated_genimage_sd15_train/metadata.csv
+--train-generator stable_diffusion_v_1_5
+--seen-generator stable_diffusion_v_1_5
+--unseen-generator BigGAN
+--output-dir outputs/M2/sd15_to_biggan
+```
+
+所以同一个训练代码可以复用在不同 generator split 上，只要换参数和 output directory。
 
 ## 总结
 
-两个方向的实验都说明同一个问题：ResNet-18 可以学会单一生成器上的 real/fake
-分类，但还不能成为真正稳健的通用 AIGC 检测器。
+两个方向现在都使用同一套 regularized/early-stopping 模型设置，因此结果是可比的。
 
-下一步应该围绕跨生成器泛化改进，例如：
+主要结论是：
 
-- 用多个生成器一起训练。
-- 加强数据增强，减少模型对固定生成器 artifact 的依赖。
-- 尝试频域特征或 artifact-focused feature。
-- 使用 ImageNet 预训练 backbone，而不是完全随机初始化。
-- 比较不同生成器组合下的 seen/unseen 泛化差距。
+ResNet-18 能够学习 seen generator 上的 real/fake 分类，但单一 generator 训练仍然
+无法得到稳健的 cross-generator AIGC detector。下一阶段更应该尝试 CLIP feature、
+多生成器训练、ImageNet pretrained backbone 或频域特征，而不是继续单纯增加 epoch。
