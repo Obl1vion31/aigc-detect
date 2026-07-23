@@ -1,5 +1,0 @@
-relative_path,split,generator,label,file_size_bytes,error
-datasets/curated_genimage/train/BigGAN/ai/116_biggan_00081.png,train,BigGAN,fake,0,UnidentifiedImageError
-datasets/curated_genimage/train/BigGAN/ai/116_biggan_00094.png,train,BigGAN,fake,0,UnidentifiedImageError
-datasets/curated_genimage/train/BigGAN/ai/116_biggan_00098.png,train,BigGAN,fake,0,UnidentifiedImageError
-datasets/curated_genimage/val/BigGAN/ai/116_biggan_00107.png,val,BigGAN,fake,0,UnidentifiedImageError

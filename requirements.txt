@@ -5,3 +5,6 @@
 # opencv-python
 # scikit-learn
 # matplotlib
+datasets
+transformers
+pyarrow

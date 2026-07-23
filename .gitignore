@@ -15,10 +15,16 @@ outputs/*
 *.pth
 *.ckpt
 *.onnx
+*.npz
 
 # Logs, caches, and notebooks
 *.log
 *.pid
+*.aux
+*.bbl
+*.blg
+*.out
+*.synctex.gz
 __pycache__/
 *.py[cod]
 .ipynb_checkpoints/

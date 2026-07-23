@@ -1,0 +1,5 @@
+index,relative_path,resnet_fake_score,clip_fake_score,caption
+5554,datasets/current/step1_bidirectional/sd3_to_midjourney/test_unseen/midjourney_v6/ai/033295_a1606eb0b9f4.jpg,0.007493255,0.9679028,A women who is holding the door handle to a truck.
+5238,datasets/current/step1_bidirectional/sd3_to_midjourney/test_unseen/midjourney_v6/ai/031433_fa495bc27ad1.jpg,0.020342613,0.96853626,A couple of men standing around and riding bikes.
+4054,datasets/current/step1_bidirectional/sd3_to_midjourney/test_unseen/midjourney_v6/ai/024295_0e57ed23895f.jpg,0.0057085427,0.95332545,A women who is holding the door handle to a truck.
+5035,datasets/current/step1_bidirectional/sd3_to_midjourney/test_unseen/midjourney_v6/ai/030289_066b00ad614e.jpg,0.013083636,0.9564034,An audience watches as a bird spreads its wings.

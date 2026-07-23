@@ -1,7 +1,0 @@
-group_type,group_name,real,fake,total
-generator,BigGAN,168000,168000,336000
-generator,stable_diffusion_v_1_5,8000,8000,16000
-split,train,145800,145800,291600
-split,val,16200,16200,32400
-split,test_seen,6000,6000,12000
-split,test_unseen,8000,8000,16000

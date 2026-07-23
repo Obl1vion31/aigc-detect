@@ -1,180 +1,76 @@
-# 项目脚本说明
+# Project Scripts
 
-这个文件夹包含 GenImage AIGC 检测项目的数据整理、数据分析和模型训练脚本。
+This folder contains the scripts for the current MS COCOAI experiments.
 
-## 数据划分脚本
+## `curate_mscocoai_split.py`
 
-### `curate_biggan_to_sd15_split.py`
+Converts local MS COCOAI parquet files into image folders plus metadata.
 
-用途：创建 Milestone 1 使用的原始数据划分，也是第一个 Milestone 2 baseline 使用的
-划分。
-
-实验协议：
-
-- 训练生成器：BigGAN。
-- 验证生成器：BigGAN。
-- seen 测试生成器：BigGAN。
-- unseen 测试生成器：Stable Diffusion v1.5。
-
-主要输出：
+Input:
 
 ```text
-datasets/curated_genimage/
-|-- metadata.csv
-`-- dataset_statistics.csv
+/root/autodl-tmp/488FP/datasets/Defactify_Image_Dataset/data
 ```
 
-这个划分用于测试：一个只在 BigGAN fake 图像上训练的检测器，能否迁移到更真实的
-diffusion 生成图上。实验结果显示，这种迁移非常弱。
+The script reads parquet files with `pyarrow` in small batches and writes the
+original image bytes to disk. It supports one generator or comma-separated
+generator lists.
 
-### `curate_sd15_to_biggan_split.py`
+Example single-generator split:
 
-用途：创建 Milestone 2 的反向数据划分。
+```bash
+/root/miniconda3/bin/python projects/curate_mscocoai_split.py \
+  --train-generator stable_diffusion_3 \
+  --unseen-generator midjourney_v6 \
+  --curated-dir datasets/current/step1_bidirectional/sd3_to_midjourney \
+  --output-dir outputs/current/step1_bidirectional/sd3_to_midjourney/curation \
+  --overwrite
+```
 
-实验协议：
+Example multi-generator split:
 
-- 训练生成器：Stable Diffusion v1.5。
-- 验证生成器：Stable Diffusion v1.5。
-- seen 测试生成器：Stable Diffusion v1.5。
-- unseen 测试生成器：BigGAN。
+```bash
+/root/miniconda3/bin/python projects/curate_mscocoai_split.py \
+  --train-generator stable_diffusion_3,sdxl \
+  --seen-generator stable_diffusion_3,sdxl \
+  --unseen-generator midjourney_v6 \
+  --curated-dir datasets/current/step2_multi_generator/sd3_sdxl_to_midjourney_anything \
+  --output-dir outputs/current/step2_multi_generator/sd3_sdxl_to_midjourney_anything/curation \
+  --overwrite
+```
 
-主要输出：
+Metadata columns:
 
 ```text
-datasets/curated_genimage_sd15_train/
-|-- metadata.csv
-`-- dataset_statistics.csv
+relative_path, source_path, split, generator, source_generator,
+class_name, label, is_fake, label_a, label_b, caption, filename
 ```
 
-这个划分用于验证一个直觉：如果用更真实的 SD1.5 fake 图像训练，模型是否会学到更
-通用的 fake 图像证据。实验结果显示，unseen BigGAN 上仍然很弱，所以单一生成器训练
-仍然是主要限制。
+## `train_resnet18_baseline.py`
 
-## 数据分析脚本
+Trains and evaluates a ResNet-18 binary classifier. It accepts one generator or
+a comma-separated generator list for `--train-generator`, `--seen-generator`,
+and `--unseen-generator`.
 
-### `analyze_m1_resolutions.py`
+Example:
 
-用途：检查 Milestone 1 curated subset 中的图像有效性、原始分辨率、图像格式和图像
-面积分布。
-
-主要输出：
-
-```text
-outputs/M1/resolution_analysis/
+```bash
+/root/miniconda3/bin/python projects/train_resnet18_baseline.py \
+  --metadata-path datasets/current/step2_multi_generator/sd3_sdxl_to_midjourney_anything/metadata.csv \
+  --train-generator stable_diffusion_3,sdxl \
+  --seen-generator stable_diffusion_3,sdxl \
+  --unseen-generator midjourney_v6 \
+  --output-dir outputs/current/step2_multi_generator/sd3_sdxl_to_midjourney_anything/run \
+  --weights none
 ```
 
-这个脚本不训练模型，只用于验证和描述数据集。
-
-## 训练脚本
-
-### `train_resnet18_baseline.py`
-
-用途：训练和评估 ResNet-18 real/fake 二分类 baseline。
-
-该脚本完成完整的 Milestone 2 训练流程：
-
-1. 读取 metadata CSV。
-2. 按 split 和 generator 筛选样本。
-3. 使用 PIL 读取图像并转换为 RGB。
-4. 对训练集或评估集应用对应 transform。
-5. 使用 cross-entropy loss 训练 ResNet-18 二分类器。
-6. 每个 epoch 结束后在 validation split 上评估。
-7. 默认根据 validation loss 保存最佳 checkpoint。
-8. 如果 validation loss 不再改善，则触发 early stopping。
-9. 使用最佳 checkpoint 评估 validation、seen test 和 unseen test。
-10. 导出 metrics、training curves、confusion matrices 和 seen/unseen 对比图。
-
-### 数据流
-
-脚本使用 `GenImageMetadataDataset` 读取数据。
-
-每一行 metadata 包含：
-
-- 图像相对路径；
-- 实验 split；
-- generator 名称；
-- 标签，`real` 或 `fake`；
-- 文件名和其他 metadata。
-
-Dataset 会根据命令行参数筛选样本，例如：
-
-```text
-split == "train" and generator == "BigGAN"
-```
-
-或者：
-
-```text
-split == "test_unseen" and generator == "stable_diffusion_v_1_5"
-```
-
-因此，同一个训练脚本可以通过不同命令行参数运行两个方向的实验。
-
-### 模型
-
-模型是 ResNet-18。原始最后一层分类头被替换为二分类输出层：
-
-```text
-real -> class 0
-fake -> class 1
-```
-
-模型在 softmax 之前输出两个 logits：
-
-```text
-logit_real, logit_fake
-```
-
-训练时，`nn.CrossEntropyLoss` 直接接收 raw logits，不需要提前手动 softmax。
-
-评估时，脚本会对 logits 做 softmax，并使用 `P(fake)` 作为 fake 类的连续置信分数，
-用于计算 AUC。
-
-### 一个 epoch 中发生什么
-
-一个 epoch 表示模型完整看过一次训练 split 中的所有图像。
-
-在一个 epoch 内部：
-
-1. DataLoader 取出一个 mini-batch 的图像和标签。
-2. 图像输入 ResNet-18。
-3. 模型为每张图输出两个 logits。
-4. Cross-entropy loss 比较 logits 和真实标签。
-5. Backpropagation 计算梯度。
-6. AdamW 根据梯度更新模型参数。
-7. 脚本累计平均 training loss。
-
-一个 epoch 结束后，模型会在 validation split 上评估。Validation 过程只计算指标，
-不更新模型参数。
-
-### 过拟合控制
-
-最初的 BigGAN baseline 很快出现过拟合：training loss 持续下降，但 validation loss
-在第 1 个 epoch 后开始上升，validation accuracy 和 F1 也下降。
-
-当前脚本加入了以下控制：
-
-- 更低的默认 learning rate；
-- 更大的 weight decay；
-- 分类头前的 dropout；
-- label smoothing；
-- 更强的数据增强；
-- cosine learning-rate schedule；
-- 根据 validation loss 保存 checkpoint；
-- early stopping。
-
-这些机制可以避免盲目训练更多 epoch。实际 regularized BigGAN 实验仍然选择 epoch 1
-作为最佳 checkpoint，并且仍然不能泛化到 unseen SD1.5。这说明主要限制不只是普通
-overfitting，而是单一训练生成器导致的 generator-specific learning。
-
-### 输出文件
-
-每次训练会输出：
+Outputs:
 
 ```text
 metrics.csv
 training_log.csv
 training_curves.png
+split_metrics.png
 confusion_matrix_seen.png
 confusion_matrix_unseen.png
 seen_unseen_comparison.png
@@ -182,4 +78,36 @@ run_config.json
 checkpoints/best_resnet18.pt
 ```
 
-checkpoint 文件在服务器上有用，但因为属于较大的模型 artifact，所以被 Git 忽略。
+## Current Results
+
+```text
+Protocol                    seen AUC  unseen AUC  unseen F1
+SD3 -> MidJourney           0.8681    0.5318      0.1747
+MidJourney -> SD3           0.9524    0.5482      0.1673
+SD3 + SDXL -> MidJourney    0.8887    0.6694      0.3695
+```
+
+## `train_clip_linear_detector.py`
+
+Trains a real/fake detector on frozen CLIP image features. The CLIP image
+encoder is not fine-tuned; only a linear classification head is trained.
+
+Example:
+
+```bash
+HF_ENDPOINT=https://hf-mirror.com /root/miniconda3/bin/python projects/train_clip_linear_detector.py \
+  --metadata-path datasets/current/step1_bidirectional/sd3_to_midjourney/metadata.csv \
+  --train-generator stable_diffusion_3 \
+  --seen-generator stable_diffusion_3 \
+  --unseen-generator midjourney_v6 \
+  --output-dir outputs/current/step3_clip/sd3_to_midjourney/run
+```
+
+Current CLIP comparison on unseen generators:
+
+```text
+Protocol                    ResNet AUC  CLIP AUC  ResNet F1  CLIP F1
+SD3 -> MidJourney           0.5318      0.8719    0.1747     0.6633
+MidJourney -> SD3           0.5482      0.9153    0.1673     0.6045
+SD3 + SDXL -> MidJourney    0.6694      0.9018    0.3695     0.7096
+```

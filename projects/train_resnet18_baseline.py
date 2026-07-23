@@ -1,17 +1,9 @@
 #!/usr/bin/env python3
 """Train a ResNet-18 baseline for real/fake image detection.
 
-Milestone 2 needs a clear baseline implementation and results. By default this
-script uses the original Milestone 1 protocol:
-
-* train/val/test_seen use BigGAN real/fake images.
-* test_unseen uses Stable Diffusion 1.5 real/fake images.
-
-Command-line arguments can reverse the protocol, for example training on SD1.5
-and treating BigGAN as the unseen generator.
-
-The main question is whether a detector trained on one generator can generalize
-to images from an unseen generator.
+The current final-project pipeline uses MS COCOAI metadata. The script can
+train on one generator or a comma-separated generator list, then evaluate on
+seen and unseen generator splits.
 """
 
 from __future__ import annotations
@@ -40,6 +32,10 @@ LABEL_TO_INDEX = {"real": 0, "fake": 1}
 INDEX_TO_LABEL = {0: "real", 1: "fake"}
 
 
+def parse_generator_list(value: str) -> set[str]:
+    return {item.strip() for item in value.split(",") if item.strip()}
+
+
 @dataclass
 class SplitMetrics:
     """Metrics for one validation/test split."""
@@ -56,11 +52,11 @@ class SplitMetrics:
 
 
 class GenImageMetadataDataset(Dataset):
-    """Read images listed in the curated GenImage metadata CSV.
+    """Read images listed in the curated MS COCOAI metadata CSV.
 
     The metadata file stores paths relative to the project root. We filter rows
-    by split and generator so that Milestone 2 uses exactly the Milestone 1
-    train/val/test_seen/test_unseen protocol.
+    by split and generator so different cross-generator protocols can reuse the
+    same training script.
     """
 
     def __init__(
@@ -76,8 +72,9 @@ class GenImageMetadataDataset(Dataset):
         self.base_dir = base_dir
         self.split = split
         self.generator = generator
+        self.generators = parse_generator_list(generator)
         self.transform = transform
-        self.metadata_path = metadata_path or self.base_dir / "datasets" / "curated_genimage" / "metadata.csv"
+        self.metadata_path = metadata_path or self.base_dir / "datasets" / "curated_mscocoai" / "metadata.csv"
         self.rows = self._read_rows()
 
         # A small subset is useful for a smoke test before committing to the
@@ -94,7 +91,7 @@ class GenImageMetadataDataset(Dataset):
         with self.metadata_path.open(newline="", encoding="utf-8") as handle:
             reader = csv.DictReader(handle)
             for row in reader:
-                if row["split"] == self.split and row["generator"] == self.generator:
+                if row["split"] == self.split and row["generator"] in self.generators:
                     rows.append(row)
 
         if not rows:
