@@ -10,6 +10,9 @@
 \usepackage[hidelinks]{hyperref}
 \usepackage[caption=false,font=footnotesize]{subfig}
 \usepackage{xurl}
+\usepackage{float}
+\usepackage{placeins}
+\usepackage{balance}
 
 \newcommand{\method}{CLIP-linear}
 \newcommand{\dataset}{MS COCOAI}
@@ -207,21 +210,26 @@ on unseen MidJourney fakes. In Step 1b, the direction is reversed. These two
 runs are important because a robust detector should transfer in both
 directions, not only from one convenient source domain.
 
-\begin{figure*}[t]
+\begin{figure}[H]
     \centering
-    \subfloat[Step 1a: SD3 $\rightarrow$ MidJourney.]{
-        \includegraphics[width=0.32\textwidth]{figures/step1a_resnet_training_curves.png}}
-    \hfill
-    \subfloat[Step 1b: MidJourney $\rightarrow$ SD3.]{
-        \includegraphics[width=0.32\textwidth]{figures/step1b_resnet_training_curves.png}}
-    \hfill
-    \subfloat[Step 2: SD3+SDXL $\rightarrow$ MidJourney.]{
-        \includegraphics[width=0.32\textwidth]{figures/step2_resnet_training_curves.png}}
-    \caption{ResNet-only training curves for the three staged protocols. The
-    model can optimize the source task, but cross-generator performance remains
-    weak, especially in the single-generator settings.}
-    \label{fig:resnet_all_curves}
-\end{figure*}
+    \includegraphics[width=0.95\columnwidth]{figures/step1a_resnet_training_curves.png}
+    \caption{Step 1a ResNet training curves: SD3 $\rightarrow$ MidJourney.}
+    \label{fig:step1a_resnet_curves}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{figures/step1b_resnet_training_curves.png}
+    \caption{Step 1b ResNet training curves: MidJourney $\rightarrow$ SD3.}
+    \label{fig:step1b_resnet_curves}
+\end{figure}
+
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{figures/step2_resnet_training_curves.png}
+    \caption{Step 2 ResNet training curves: SD3+SDXL $\rightarrow$ MidJourney.}
+    \label{fig:step2_resnet_curves}
+\end{figure}
 
 \begin{table}[t]
     \centering
@@ -241,19 +249,22 @@ directions, not only from one convenient source domain.
     }
 \end{table}
 
-Figure~\ref{fig:resnet_all_curves} and Table~\ref{tab:main_results} show that
-single-generator ResNet training does not generalize well. The unseen AUC is
-0.5318 for SD3 $\rightarrow$ MidJourney and 0.5482 for MidJourney $\rightarrow$
-SD3, close to random ranking. The corresponding F1 scores, 0.1747 and 0.1673,
-are even more concerning: the detector misses most fake images from the unseen
-generator. This indicates that the CNN has learned source-generator cues rather
-than generator-invariant evidence of synthesis.
+Figures~\ref{fig:step1a_resnet_curves}--\ref{fig:step2_resnet_curves} and
+Table~\ref{tab:main_results} show that single-generator ResNet training does
+not generalize well. The unseen AUC is 0.5318 for SD3 $\rightarrow$ MidJourney
+and 0.5482 for MidJourney $\rightarrow$ SD3, close to random ranking. The
+corresponding F1 scores, 0.1747 and 0.1673, are even more concerning: the
+detector misses most fake images from the unseen generator. This indicates that
+the CNN has learned source-generator cues rather than generator-invariant
+evidence of synthesis.
 
 Step 2 then adds SDXL to the SD3 training set. This raises ResNet unseen
 MidJourney AUC from 0.5318 to 0.6694 and F1 from 0.1747 to 0.3695. Therefore,
 generator diversity does help, but the improvement is limited. The detector is
 better than the single-generator version, yet it still fails to reach a level
 that would be reliable under practical generator shift.
+
+\FloatBarrier
 
 \subsection{Step 3: CLIP Comparison}
 
@@ -267,7 +278,7 @@ semantic and structural information in addition to local appearance. In this
 project, CLIP is not fine-tuned; only a small linear classifier is trained on
 top of frozen CLIP image embeddings.
 
-\begin{figure}[t]
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{figures/step3_clip_vs_resnet_unseen.png}
     \caption{Step 3 comparison on unseen generators. CLIP-linear improves AUC
@@ -275,20 +286,21 @@ top of frozen CLIP image embeddings.
     \label{fig:clip_vs_resnet}
 \end{figure}
 
-\begin{figure*}[t]
+\begin{figure}[H]
     \centering
-    \subfloat[Step 2 ResNet split metrics.]{
-        \includegraphics[width=0.48\textwidth]{figures/step2_resnet_split_metrics.png}}
-    \hfill
-    \subfloat[Step 3 CLIP-linear split metrics.]{
-        \includegraphics[width=0.48\textwidth]{figures/step3_clip_split_metrics.png}}
-    \caption{Direct comparison between the best ResNet setting and the
-    corresponding CLIP-linear setting. CLIP keeps stronger unseen-generator
-    performance while maintaining high seen-generator performance.}
-    \label{fig:step2_step3_split}
-\end{figure*}
+    \includegraphics[width=0.95\columnwidth]{figures/step2_resnet_split_metrics.png}
+    \caption{Step 2 ResNet split metrics for SD3+SDXL $\rightarrow$ MidJourney.}
+    \label{fig:step2_resnet_split}
+\end{figure}
 
-\begin{figure}[t]
+\begin{figure}[H]
+    \centering
+    \includegraphics[width=0.95\columnwidth]{figures/step3_clip_split_metrics.png}
+    \caption{Step 3 CLIP-linear split metrics across the three protocols.}
+    \label{fig:step3_clip_split}
+\end{figure}
+
+\begin{figure}[H]
     \centering
     \includegraphics[width=\columnwidth]{figures/step3_clip_training_curves.png}
     \caption{Step 3 CLIP-linear training curves for SD3+SDXL $\rightarrow$
@@ -300,9 +312,10 @@ The difference is substantial. For SD3 $\rightarrow$ MidJourney, CLIP improves
 unseen AUC from 0.5318 to 0.8719 and F1 from 0.1747 to 0.6633. For the reverse
 direction, AUC increases from 0.5482 to 0.9153. In the strongest setting,
 SD3+SDXL $\rightarrow$ MidJourney, CLIP reaches unseen AUC 0.9018 and F1
-0.7096. Figure~\ref{fig:step2_step3_split} makes the improvement more direct:
-the ResNet split metrics still show a large gap between seen and unseen
-performance, while CLIP produces a more balanced pattern across splits.
+0.7096. Figures~\ref{fig:step2_resnet_split} and~\ref{fig:step3_clip_split}
+make the improvement more direct: the ResNet split metrics still show a large
+gap between seen and unseen performance, while CLIP produces a more balanced
+pattern across splits.
 
 \begin{table}[h]
 \centering
@@ -330,15 +343,17 @@ to 4226 while keeping false positives low. The main gain is therefore not only
 better ranking AUC; CLIP also reduces the number of fake images that are
 mistakenly accepted as real.
 
+\FloatBarrier
+
 \subsection{Qualitative Examples}
 
-\begin{figure*}[t]
+\begin{figure}[H]
     \centering
-    \includegraphics[width=0.9\textwidth]{figures/qual_resnet_missed_clip_detected.png}
+    \includegraphics[width=0.95\columnwidth]{figures/qual_resnet_missed_clip_detected_2x2.png}
     \caption{Unseen MidJourney fake images missed by ResNet but detected by
     CLIP. Numbers are predicted fake probabilities.}
     \label{fig:qualitative}
-\end{figure*}
+\end{figure}
 
 Figure~\ref{fig:qualitative} shows fake MidJourney images from the unseen split
 where ResNet predicts ``real'' but CLIP predicts ``fake''. These examples make
@@ -370,6 +385,7 @@ all protocols. Future work should evaluate additional generator combinations,
 frequency-domain features, and CLIP fine-tuning.
 
 \bibliographystyle{IEEEtran}
+\balance
 \bibliography{references}
 
 \clearpage
